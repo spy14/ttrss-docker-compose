@@ -5,7 +5,10 @@ version: '3'
 
 services:
   db:
-    image: postgres:12-alpine
+    image: cthulhoo/ttrss-db-pgsql-count-bits:${BUILD_TAG}
+    build:
+      context:
+        ./db
     restart: unless-stopped
     volumes:
       - db:/var/lib/postgresql/data

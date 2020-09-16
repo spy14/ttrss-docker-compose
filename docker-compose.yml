@@ -5,7 +5,7 @@ version: '3'
 
 services:
   db:
-    image: postgres:12-alpine
+    image: cthulhoo/ttrss-db-pgsql-count-bits:latest
     restart: unless-stopped
     volumes:
       - db:/var/lib/postgresql/data
