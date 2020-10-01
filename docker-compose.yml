@@ -6,6 +6,9 @@ version: '3'
 services:
   db:
     image: cthulhoo/ttrss-db-pgsql-12-count-bits:latest
+    build:
+      context:
+        ./db
     restart: unless-stopped
     volumes:
       - db:/var/lib/postgresql/data
