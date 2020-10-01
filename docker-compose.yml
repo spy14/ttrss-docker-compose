@@ -5,7 +5,7 @@ version: '3'
 
 services:
   db:
-    image: cthulhoo/ttrss-db-pgsql-12-count-bits:latest
+    image: cthulhoo/postgres-count-bits:12-latest
     build:
       context:
         ./db
