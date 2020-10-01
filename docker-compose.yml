@@ -5,7 +5,7 @@ version: '3'
 
 services:
   db:
-    image: cthulhoo/ttrss-db-pgsql-count-bits:latest
+    image: cthulhoo/ttrss-db-pgsql-12-count-bits:latest
     restart: unless-stopped
     volumes:
       - db:/var/lib/postgresql/data
