@@ -1,12 +1,12 @@
-FROM alpine:3.13
+FROM alpine:3.5
 EXPOSE 9000/tcp
 
-RUN apk add --no-cache dcron php8 php8-fpm \
-	php8-pdo php8-gd php8-pgsql php8-pdo_pgsql php8-mbstring \
-	php8-intl php8-xml php8-curl php8-session \
-	php8-dom php8-fileinfo php8-json php8-iconv \
-	php8-pcntl php8-posix php8-zip php8-openssl \
-	git postgresql-client sudo
+RUN apk add --no-cache dcron php5 php5-fpm \
+	php5-pdo php5-gd php5-pgsql php5-pdo_pgsql \
+	php5-intl php5-xml php5-curl \
+	php5-dom php5-json php5-iconv \
+	php5-pcntl php5-posix php5-zip php5-openssl \
+	git postgresql-client sudo php5-ctype
 
 ENV SCRIPT_ROOT=/opt/tt-rss
 
@@ -19,12 +19,20 @@ ADD dcron.sh ${SCRIPT_ROOT}
 ADD backup.sh /etc/periodic/weekly/backup
 ADD config.docker.php ${SCRIPT_ROOT}
 
-RUN sed -i.bak 's/^listen = 127.0.0.1:9000/listen = 9000/' /etc/php8/php-fpm.d/www.conf
-RUN sed -i.bak 's/\(memory_limit =\) 128M/\1 256M/' /etc/php8/php.ini
-RUN sed -i.bak 's/;clear_env = .*/clear_env = no/i' /etc/php8/php-fpm.d/www.conf
+RUN sed -i.bak 's/^listen = 127.0.0.1:9000/listen = 9000/' /etc/php5/php-fpm.conf
+#RUN sed -i.bak 's/\(memory_limit =\) 128M/\1 256M/' /etc/php5/php.ini
+RUN sed -i.bak 's/;clear_env = .*/clear_env = no/i' /etc/php5/php-fpm.conf
 
 ENV OWNER_UID=1000
 ENV OWNER_GID=1000
+
+#commit b25df544b4d77a3deb43c9968797e5703e1e84f2 (HEAD)
+#Author: Andrew Dolgov <fox@bah.org.ru>
+#Date:   Mon Sep 13 16:10:17 2010 +0400
+#
+#    release 1.4.3.1
+
+ENV TARGET_COMMIT="b25df544b4d77a3deb43c9968797e5703e1e84f2"
 
 ENV TTRSS_DB_TYPE="pgsql"
 ENV TTRSS_DB_HOST="db"
@@ -34,29 +42,67 @@ ENV TTRSS_DB_PASS="%DB_PASS"
 ENV TTRSS_DB_PORT="5432"
 
 # config.php defaults
-ENV TTRSS_MYSQL_CHARSET="UTF8"
-ENV TTRSS_SELF_URL_PATH="%SELF_URL_PATH"
-ENV TTRSS_SINGLE_USER_MODE=""
-ENV TTRSS_SIMPLE_UPDATE_MODE=""
-ENV TTRSS_PHP_EXECUTABLE="/usr/bin/php8"
-ENV TTRSS_LOCK_DIRECTORY="lock"
-ENV TTRSS_CACHE_DIR="cache"
-ENV TTRSS_ICONS_DIR="feed-icons"
-ENV TTRSS_ICONS_URL="feed-icons"
-ENV TTRSS_AUTH_AUTO_CREATE="true"
-ENV TTRSS_AUTH_AUTO_LOGIN="true"
-ENV TTRSS_FORCE_ARTICLE_PURGE="0"
+#ENV TTRSS_MYSQL_CHARSET="UTF8"
+#ENV TTRSS_SELF_URL_PATH="%SELF_URL_PATH"
+#ENV TTRSS_SINGLE_USER_MODE=""
+#ENV TTRSS_SIMPLE_UPDATE_MODE=""
+#ENV TTRSS_PHP_EXECUTABLE="/usr/bin/php5"
+#ENV TTRSS_LOCK_DIRECTORY="lock"
+#ENV TTRSS_CACHE_DIR="cache"
+#ENV TTRSS_ICONS_DIR="feed-icons"
+#ENV TTRSS_ICONS_URL="feed-icons"
+#ENV TTRSS_AUTH_AUTO_CREATE="true"
+#ENV TTRSS_AUTH_AUTO_LOGIN="true"
+#ENV TTRSS_FORCE_ARTICLE_PURGE="0"
+#ENV TTRSS_ENABLE_REGISTRATION=""
+#ENV TTRSS_REG_NOTIFY_ADDRESS="user@your.domain.dom"
+#ENV TTRSS_REG_MAX_USERS="10"
+#ENV TTRSS_SESSION_COOKIE_LIFETIME="86400"
+#ENV TTRSS_SMTP_FROM_NAME="Tiny Tiny RSS"
+#ENV TTRSS_SMTP_FROM_ADDRESS="noreply@your.domain.dom"
+#ENV TTRSS_DIGEST_SUBJECT="[tt-rss] New headlines for last 24 hours"
+#ENV TTRSS_CHECK_FOR_UPDATES="true"
+#ENV TTRSS_ENABLE_GZIP_OUTPUT=""
+#ENV TTRSS_PLUGINS="auth_internal, note, nginx_xaccel"
+#ENV TTRSS_LOG_DESTINATION="sql"
+#ENV TTRSS_CONFIG_VERSION="26"
+
+ENV TTRSS_MAGPIE_FETCH_TIME_OUT="60"
+ENV TTRSS_MAGPIE_CACHE_DIR="/var/tmp/magpie-ttrss-cache"
+ENV TTRSS_MAGPIE_CACHE_AGE="60*30"
+ENV TTRSS_ICONS_DIR="icons"
+ENV TTRSS_ICONS_URL="icons"
+ENV TTRSS_SINGLE_USER_MODE="true"
+ENV TTRSS_TMP_DIRECTORY="/tmp"
+ENV TTRSS_FEEDS_FRAME_REFRESH="600"
+ENV TTRSS_ENABLE_UPDATE_DAEMON="1"
+ENV TTRSS_DAEMON_SLEEP_INTERVAL="120"
+ENV TTRSS_DATABASE_BACKED_SESSIONS=""
+ENV TTRSS_SESSION_CHECK_ADDRESS="true"
+ENV TTRSS_SESSION_COOKIE_LIFETIME="0"
+ENV TTRSS_SESSION_EXPIRE_TIME="86400"
+ENV TTRSS_DAEMON_UPDATE_LOGIN_LIMIT="0"
+ENV TTRSS_CHECK_FOR_NEW_VERSION="true"
+ENV TTRSS_USE_CURL_FOR_ICONS=""
+ENV TTRSS_DIGEST_ENABLE="true"
+ENV TTRSS_DIGEST_EMAIL_LIMIT="10"
+ENV TTRSS_DAEMON_SENDS_DIGESTS="true"
+ENV TTRSS_ENABLE_TRANSLATIONS="true"
+ENV TTRSS_DEFAULT_UPDATE_METHOD="0"
+ENV TTRSS_SIMPLEPIE_CACHE_IMAGES=""
+ENV TTRSS_COUNTERS_MAX_AGE="365"
+ENV TTRSS_DIGEST_FROM_NAME="Tiny Tiny RSS"
+ENV TTRSS_DIGEST_FROM_ADDRESS="noreply@your.domain.dom"
+ENV TTRSS_DIGEST_SUBJECT="[tt-rss] New headlines for last 24 hours"
+ENV TTRSS_DAEMON_FEED_LIMIT="100"
+ENV TTRSS_ALLOW_REMOTE_USER_AUTH=""
+ENV TTRSS_LOCK_DIRECTORY="."
+ENV TTRSS_ENABLE_GZIP_OUTPUT=""
+ENV TTRSS_PHP_EXECUTABLE="/usr/bin/php"
 ENV TTRSS_ENABLE_REGISTRATION=""
 ENV TTRSS_REG_NOTIFY_ADDRESS="user@your.domain.dom"
 ENV TTRSS_REG_MAX_USERS="10"
-ENV TTRSS_SESSION_COOKIE_LIFETIME="86400"
-ENV TTRSS_SMTP_FROM_NAME="Tiny Tiny RSS"
-ENV TTRSS_SMTP_FROM_ADDRESS="noreply@your.domain.dom"
-ENV TTRSS_DIGEST_SUBJECT="[tt-rss] New headlines for last 24 hours"
-ENV TTRSS_CHECK_FOR_UPDATES="true"
-ENV TTRSS_ENABLE_GZIP_OUTPUT=""
-ENV TTRSS_PLUGINS="auth_internal, note, nginx_xaccel"
-ENV TTRSS_LOG_DESTINATION="sql"
-ENV TTRSS_CONFIG_VERSION="26"
+ENV TTRSS_FORCE_ARTICLE_PURGE="0"
+ENV TTRSS_CONFIG_VERSION="19"
 
 CMD ${SCRIPT_ROOT}/startup.sh

@@ -12,7 +12,7 @@ if ! id app; then
 	adduser -D -h /var/www/html -G app -u $OWNER_UID app
 fi
 
-while ! pg_isready -h $TTRSS_DB_HOST -U $TTRSS_DB_USER; do
+while ! PGPASSWORD=$TTRSS_DB_PASS psql -h $TTRSS_DB_HOST -U $TTRSS_DB_USER $TTRSS_DB_NAME -c 'select true'; do
 	echo waiting until $TTRSS_DB_HOST is ready...
 	sleep 3
 done
@@ -24,4 +24,6 @@ while [ ! -s $DST_DIR/config.php -a -e $DST_DIR/.app_is_ready ]; do
 	sleep 3
 done
 
-sudo -E -u app /usr/bin/php8 /var/www/html/tt-rss/update_daemon2.php
+cd $DST_DIR
+
+sudo -E -u app /usr/bin/php /var/www/html/tt-rss/update_daemon2.php

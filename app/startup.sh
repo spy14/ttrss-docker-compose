@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-while ! pg_isready -h $TTRSS_DB_HOST -U $TTRSS_DB_USER; do
+while ! PGPASSWORD=$TTRSS_DB_PASS psql -h $TTRSS_DB_HOST -U $TTRSS_DB_USER $TTRSS_DB_NAME -c 'select true'; do
 	echo waiting until $TTRSS_DB_HOST is ready...
 	sleep 3
 done
@@ -29,12 +29,13 @@ if [ ! -d $DST_DIR/.git ]; then
 	mkdir -p $DST_DIR
 	echo cloning tt-rss source from $SRC_REPO to $DST_DIR...
 	git clone $SRC_REPO $DST_DIR || echo error: failed to clone master repository.
+	git checkout $TARGET_COMMIT || echo error: unable to checkout ${TARGET_COMMIT}.
 else
 	echo updating tt-rss source in $DST_DIR from $SRC_REPO...
 	cd $DST_DIR && \
 		git config core.filemode false && \
 		git config pull.rebase false && \
-		git pull origin master || echo error: unable to update master repository.
+		git checkout $TARGET_COMMIT || echo error: unable to checkout ${TARGET_COMMIT}.
 fi
 
 if [ ! -e $DST_DIR/index.php ]; then
@@ -55,9 +56,10 @@ else
 fi
 
 chown -R $OWNER_UID:$OWNER_GID $DST_DIR \
-	/var/log/php8
+	/var/log/
 
-for d in cache lock feed-icons; do
+for d in lock icons; do
+	mkdir -p $DST_DIR/$d
 	chmod 777 $DST_DIR/$d
 	find $DST_DIR/$d -type f -exec chmod 666 {} \;
 done
@@ -69,7 +71,7 @@ RESTORE_SCHEMA=${SCRIPT_ROOT}/restore-schema.sql.gz
 if [ -r $RESTORE_SCHEMA ]; then
 	zcat $RESTORE_SCHEMA | $PSQL
 elif ! $PSQL -c 'select * from ttrss_version'; then
-	$PSQL < /var/www/html/tt-rss/schema/ttrss_schema_pgsql.sql
+	cat /var/www/html/tt-rss/schema/ttrss_schema_pgsql.sql | sed 's/tt-rss.spb.ru/tt-rss.org/g' | $PSQL
 fi
 
 if [ ! -s $DST_DIR/config.php ]; then
@@ -85,9 +87,9 @@ fi
 # this was previously generated
 rm -f $DST_DIR/config.php.bak
 
-cd $DST_DIR && sudo -E -u app php8 ./update.php --update-schema=force-yes
+cd $DST_DIR && sudo -E -u app php ./update.php --update-schema=force-yes
 
 touch $DST_DIR/.app_is_ready
 
-sudo -E -u app /usr/sbin/php-fpm8 -F
+sudo -E -u app /usr/bin/php-fpm -F
 
