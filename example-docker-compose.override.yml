@@ -2,5 +2,5 @@ version: '3'
 
 services:
   db:
-    image: cthulhoo/postgres-count-bits:12-latest
+    image: cthulhoo/postgres-count-bits:13-latest
 
