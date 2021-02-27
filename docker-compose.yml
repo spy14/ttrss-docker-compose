@@ -2,12 +2,13 @@ version: '3'
 
 services:
   db:
-    image: postgres:12-alpine
+    image: mariadb:10
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${TTRSS_DB_USER}
-      - POSTGRES_PASSWORD=${TTRSS_DB_PASS}
-      - POSTGRES_DB=${TTRSS_DB_NAME}
+      - MYSQL_USER=${TTRSS_DB_USER}
+      - MYSQL_PASSWORD=${TTRSS_DB_PASS}
+      - MYSQL_ROOT_PASSWORD=${TTRSS_DB_PASS}
+      - MYSQL_DATABASE=${TTRSS_DB_NAME}
     volumes:
       - db:/var/lib/postgresql/data
 
@@ -38,44 +39,19 @@ services:
       - db
     command: /opt/tt-rss/dcron.sh -f
 
-  updater:
-    build:
-      context:
-        ./app
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - app:/var/www/html
-      - ./config.d:/opt/tt-rss/config.d:ro
-    depends_on:
-      - app
-    command: /opt/tt-rss/updater.sh
-
-#  web:
-#    build: ./web
+#  updater:
+#    build:
+#      context:
+#        ./app
 #    restart: unless-stopped
-#    ports:
-#      - ${HTTP_PORT}:2015
+#    env_file:
+#      - .env
 #    volumes:
-#      - app:/var/www/html:ro
+#      - app:/var/www/html
+#      - ./config.d:/opt/tt-rss/config.d:ro
 #    depends_on:
 #      - app
-
-#  web-ssl:
-#    build: ./web-ssl
-#    restart: unless-stopped
-#    environment:
-#      - CADDYPATH=/certs
-#      - HTTP_HOST=${HTTP_HOST}
-#    ports:
-#      - 80:80
-#      - 443:443
-#    volumes:
-#      - app:/var/www/html:ro
-#      - certs:/certs
-#    depends_on:
-#      - app
+#    command: /opt/tt-rss/updater.sh
 
   web-nginx:
     build: ./web-nginx

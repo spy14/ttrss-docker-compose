@@ -12,7 +12,7 @@ if ! id app >/dev/null 2>&1; then
 	adduser -D -h /var/www/html -G app -u $OWNER_UID app
 fi
 
-while ! pg_isready -h $TTRSS_DB_HOST -U $TTRSS_DB_USER; do
+while ! mysql -h $TTRSS_DB_HOST -u $TTRSS_DB_USER -p$TTRSS_DB_PASS -e "select 1"; do
 	echo waiting until $TTRSS_DB_HOST is ready...
 	sleep 3
 done

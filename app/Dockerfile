@@ -2,11 +2,11 @@ FROM alpine:3.13
 EXPOSE 9000/tcp
 
 RUN apk add --no-cache dcron php8 php8-fpm \
-	php8-pdo php8-gd php8-pgsql php8-pdo_pgsql php8-mbstring \
+	php8-pdo php8-gd php8-mysqlnd php8-pdo_mysql php8-mbstring \
 	php8-intl php8-xml php8-curl php8-session \
 	php8-dom php8-fileinfo php8-json php8-iconv \
 	php8-pcntl php8-posix php8-zip php8-openssl \
-	git postgresql-client sudo php8-pecl-xdebug
+	git mysql-client sudo php8-pecl-xdebug
 
 ENV SCRIPT_ROOT=/opt/tt-rss
 
@@ -31,9 +31,9 @@ ENV TTRSS_XDEBUG_ENABLED=""
 ENV TTRSS_XDEBUG_HOST=""
 ENV TTRSS_XDEBUG_PORT="9000"
 
-ENV TTRSS_DB_TYPE="pgsql"
+ENV TTRSS_DB_TYPE="mysql"
 ENV TTRSS_DB_HOST="db"
-ENV TTRSS_DB_PORT="5432"
+ENV TTRSS_DB_PORT="3306"
 
 ENV TTRSS_MYSQL_CHARSET="UTF8"
 ENV TTRSS_PHP_EXECUTABLE="/usr/bin/php8"

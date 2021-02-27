@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-while ! pg_isready -h $TTRSS_DB_HOST -U $TTRSS_DB_USER; do
+while ! mysql -h $TTRSS_DB_HOST -u $TTRSS_DB_USER -p$TTRSS_DB_PASS -e "select 1"; do
 	echo waiting until $TTRSS_DB_HOST is ready...
 	sleep 3
 done
@@ -19,11 +19,9 @@ SRC_REPO=https://git.tt-rss.org/fox/tt-rss.git
 
 [ -e $DST_DIR ] && rm -f $DST_DIR/.app_is_ready
 
-export PGPASSWORD=$TTRSS_DB_PASS 
-
 [ ! -e /var/www/html/index.php ] && cp ${SCRIPT_ROOT}/index.php /var/www/html
 
-PSQL="psql -q -h $TTRSS_DB_HOST -U $TTRSS_DB_USER $TTRSS_DB_NAME"
+PSQL="mysql -q -h $TTRSS_DB_HOST -u $TTRSS_DB_USER -p$TTRSS_DB_PASS $TTRSS_DB_NAME"
 
 if [ ! -d $DST_DIR/.git ]; then
 	mkdir -p $DST_DIR
@@ -65,14 +63,12 @@ for d in cache lock feed-icons; do
 	find $DST_DIR/$d -type f -exec chmod 666 {} \;
 done
 
-$PSQL -c "create extension if not exists pg_trgm"
-
 RESTORE_SCHEMA=${SCRIPT_ROOT}/restore-schema.sql.gz
 
 if [ -r $RESTORE_SCHEMA ]; then
 	zcat $RESTORE_SCHEMA | $PSQL
-elif ! $PSQL -c 'select * from ttrss_version'; then
-	$PSQL < /var/www/html/tt-rss/schema/ttrss_schema_pgsql.sql
+elif ! $PSQL -e 'select * from ttrss_version'; then
+	$PSQL < /var/www/html/tt-rss/schema/ttrss_schema_mysql.sql
 fi
 
 # this was previously generated
