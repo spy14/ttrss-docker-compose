@@ -39,19 +39,19 @@ services:
       - db
     command: /opt/tt-rss/dcron.sh -f
 
-#  updater:
-#    build:
-#      context:
-#        ./app
-#    restart: unless-stopped
-#    env_file:
-#      - .env
-#    volumes:
-#      - app:/var/www/html
-#      - ./config.d:/opt/tt-rss/config.d:ro
-#    depends_on:
-#      - app
-#    command: /opt/tt-rss/updater.sh
+  updater:
+    build:
+      context:
+        ./app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - app:/var/www/html
+      - ./config.d:/opt/tt-rss/config.d:ro
+    depends_on:
+      - app
+    command: /opt/tt-rss/updater.sh
 
   web-nginx:
     build: ./web-nginx
