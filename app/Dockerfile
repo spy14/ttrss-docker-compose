@@ -35,6 +35,7 @@ ENV TTRSS_DB_TYPE="mysql"
 ENV TTRSS_DB_HOST="db"
 ENV TTRSS_DB_PORT="3306"
 
+ENV TTRSS_SESSION_NAME="ttrss_sid_mysql"
 ENV TTRSS_MYSQL_CHARSET="UTF8"
 ENV TTRSS_PHP_EXECUTABLE="/usr/bin/php8"
 ENV TTRSS_PLUGINS="auth_internal, note, nginx_xaccel"
