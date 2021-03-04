@@ -63,14 +63,6 @@ for d in cache lock feed-icons; do
 	find $DST_DIR/$d -type f -exec chmod 666 {} \;
 done
 
-RESTORE_SCHEMA=${SCRIPT_ROOT}/restore-schema.sql.gz
-
-if [ -r $RESTORE_SCHEMA ]; then
-	zcat $RESTORE_SCHEMA | $PSQL
-elif ! $PSQL -e 'select * from ttrss_version'; then
-	$PSQL < /var/www/html/tt-rss/schema/ttrss_schema_mysql.sql
-fi
-
 # this was previously generated
 rm -f $DST_DIR/config.php.bak
 
