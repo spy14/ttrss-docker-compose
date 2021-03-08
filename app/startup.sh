@@ -66,6 +66,7 @@ done
 RESTORE_SCHEMA=${SCRIPT_ROOT}/restore-schema.sql.gz
 
 if [ -r $RESTORE_SCHEMA ]; then
+	# TODO: drop/recreate database?
 	zcat $RESTORE_SCHEMA | $PSQL
 fi
 
