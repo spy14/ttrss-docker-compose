@@ -58,7 +58,7 @@ cp ${SCRIPT_ROOT}/config.docker.php $DST_DIR/config.php
 chmod 644 $DST_DIR/config.php
 
 chown -R $OWNER_UID:$OWNER_GID $DST_DIR \
-	/var/log/php8
+	/var/log/php7
 
 for d in cache lock feed-icons; do
 	chmod 777 $DST_DIR/$d
@@ -83,7 +83,7 @@ if [ ! -z "${TTRSS_XDEBUG_ENABLED}" ]; then
 	fi
 	echo enabling xdebug with the following parameters:
 	env | grep TTRSS_XDEBUG
-	cat > /etc/php8/conf.d/50_xdebug.ini <<EOF
+	cat > /etc/php7/conf.d/50_xdebug.ini <<EOF
 zend_extension=xdebug.so
 xdebug.mode=develop,trace,debug
 xdebug.start_with_request = yes
@@ -92,7 +92,7 @@ xdebug.client_host = ${TTRSS_XDEBUG_HOST}
 EOF
 fi
 
-cd $DST_DIR && sudo -E -u app php8 ./update.php --update-schema=force-yes
+cd $DST_DIR && sudo -E -u app php7 ./update.php --update-schema=force-yes
 
 rm -f /tmp/error.log && mkfifo /tmp/error.log && chown app:app /tmp/error.log
 
@@ -100,4 +100,4 @@ rm -f /tmp/error.log && mkfifo /tmp/error.log && chown app:app /tmp/error.log
 
 touch $DST_DIR/.app_is_ready
 
-exec /usr/sbin/php-fpm8 --nodaemonize --force-stderr
+exec /usr/sbin/php-fpm7 --nodaemonize --force-stderr
