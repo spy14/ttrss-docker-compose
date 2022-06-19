@@ -10,9 +10,16 @@ unset HTTP_PORT
 unset HTTP_HOST
 
 if ! id app >/dev/null 2>&1; then
-	addgroup -g $OWNER_GID app
-	adduser -D -h /var/www/html -G app -u $OWNER_UID app
+	# what if i actually need a duplicate GID/UID group?
+
+	addgroup -g $OWNER_GID app || echo app:x:$OWNER_GID:app | \
+		tee -a /etc/group
+
+	adduser -D -h /var/www/html -G app -u $OWNER_UID app || \
+		echo app:x:$OWNER_UID:$OWNER_GID:Linux User,,,:/var/www/html:/bin/ash | tee -a /etc/passwd
 fi
+
+update-ca-certificates || true
 
 DST_DIR=/var/www/html/tt-rss
 SRC_REPO=https://git.tt-rss.org/fox/tt-rss.git
@@ -42,26 +49,42 @@ fi
 
 if [ ! -d $DST_DIR/plugins.local/nginx_xaccel ]; then
 	echo cloning plugins.local/nginx_xaccel...
-	git clone https://git.tt-rss.org/fox/ttrss-nginx-xaccel.git \
-		$DST_DIR/plugins.local/nginx_xaccel ||  echo error: failed to clone plugin repository.
+	sudo -u app git clone https://git.tt-rss.org/fox/ttrss-nginx-xaccel.git \
+		$DST_DIR/plugins.local/nginx_xaccel ||  echo warning: failed to clone nginx_xaccel.
 else
-	echo updating plugins.local/nginx_xaccel...
-	cd $DST_DIR/plugins.local/nginx_xaccel && \
-		git config core.filemode false && \
-		git config pull.rebase false && \
-	  	git pull origin master || echo error: failed to update plugin repository.
+	if [ -z "$TTRSS_NO_STARTUP_PLUGIN_UPDATES" ]; then
+		echo updating all local plugins...
+
+		find $DST_DIR/plugins.local/ -maxdepth 1 -mindepth 1 -type d | while read PLUGIN; do
+			if [ -d $PLUGIN/.git ]; then
+				echo updating $PLUGIN...
+
+				cd $PLUGIN && \
+					sudo -u app git config core.filemode false && \
+					sudo -u app git config pull.rebase false && \
+					sudo -u app git pull origin master || echo warning: attempt to update plugin $PLUGIN failed.
+			fi
+		done
+	else
+		echo updating plugins.local/nginx_xaccel...
+
+		cd $DST_DIR/plugins.local/nginx_xaccel && \
+			sudo -u app git config core.filemode false && \
+			sudo -u app git config pull.rebase false && \
+			sudo -u app git pull origin master || echo warning: attempt to update plugin nginx_xaccel failed.
+	fi
 fi
 
 cp ${SCRIPT_ROOT}/config.docker.php $DST_DIR/config.php
 chmod 644 $DST_DIR/config.php
 
-chown -R $OWNER_UID:$OWNER_GID $DST_DIR \
-	/var/log/php8
-
 for d in cache lock feed-icons; do
 	chmod 777 $DST_DIR/$d
 	find $DST_DIR/$d -type f -exec chmod 666 {} \;
 done
+
+chown -R $OWNER_UID:$OWNER_GID $DST_DIR \
+	/var/log/php8
 
 RESTORE_SCHEMA=${SCRIPT_ROOT}/restore-schema.sql.gz
 
@@ -88,11 +111,44 @@ xdebug.client_host = ${TTRSS_XDEBUG_HOST}
 EOF
 fi
 
-cd $DST_DIR && sudo -E -u app php8 ./update.php --update-schema=force-yes
+sed -i.bak "s/^\(memory_limit\) = \(.*\)/\1 = ${PHP_WORKER_MEMORY_LIMIT}/" \
+	/etc/php8/php.ini
+
+sed -i.bak "s/^\(pm.max_children\) = \(.*\)/\1 = ${PHP_WORKER_MAX_CHILDREN}/" \
+	/etc/php8/php-fpm.d/www.conf
+
+sudo -Eu app php8 $DST_DIR/update.php --update-schema=force-yes
+
+if [ ! -z "$ADMIN_USER_PASS" ]; then
+	sudo -Eu app php8 $DST_DIR/update.php --user-set-password "admin:$ADMIN_USER_PASS"
+else
+	if sudo -Eu app php8 $DST_DIR/update.php --user-check-password "admin:password"; then
+		RANDOM_PASS=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16 ; echo '')
+
+		echo "*****************************************************************************"
+		echo "* Setting initial built-in admin user password to '$RANDOM_PASS'        *"
+		echo "* If you want to set it manually, use ADMIN_USER_PASS environment variable. *"
+		echo "*****************************************************************************"
+
+		sudo -Eu app php8 $DST_DIR/update.php --user-set-password "admin:$RANDOM_PASS"
+	fi
+fi
+
+if [ ! -z "$ADMIN_USER_ACCESS_LEVEL" ]; then
+	sudo -Eu app php8 $DST_DIR/update.php --user-set-access-level "admin:$ADMIN_USER_ACCESS_LEVEL"
+fi
+
+if [ ! -z "$AUTO_CREATE_USER" ]; then
+	sudo -Eu app /bin/sh -c "php8 $DST_DIR/update.php --user-exists $AUTO_CREATE_USER ||
+		php8 $DST_DIR/update.php --force-yes --user-add \"$AUTO_CREATE_USER:$AUTO_CREATE_USER_PASS:$AUTO_CREATE_USER_ACCESS_LEVEL\""
+fi
 
 rm -f /tmp/error.log && mkfifo /tmp/error.log && chown app:app /tmp/error.log
 
 (tail -q -f /tmp/error.log >> /proc/1/fd/2) &
+
+unset ADMIN_USER_PASS
+unset AUTO_CREATE_USER_PASS
 
 touch $DST_DIR/.app_is_ready
 
