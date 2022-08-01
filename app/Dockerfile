@@ -28,6 +28,22 @@ ADD config.docker.php ${SCRIPT_ROOT}
 ENV OWNER_UID=1000
 ENV OWNER_GID=1000
 
+ENV PHP_WORKER_MAX_CHILDREN=5
+ENV PHP_WORKER_MEMORY_LIMIT=256M
+
+# these are applied on every startup, if set
+ENV ADMIN_USER_PASS=""
+# see classes/UserHelper.php ACCESS_LEVEL_*
+# setting this to -2 would effectively disable built-in admin user
+# unless single user mode is enabled
+ENV ADMIN_USER_ACCESS_LEVEL=""
+
+# these are applied unless user already exists
+ENV AUTO_CREATE_USER=""
+ENV AUTO_CREATE_USER_PASS=""
+ENV AUTO_CREATE_USER_ACCESS_LEVEL="0"
+
+
 # don't try to update local plugins on startup (except for nginx_xaccel)
 ENV TTRSS_NO_STARTUP_PLUGIN_UPDATES=""
 

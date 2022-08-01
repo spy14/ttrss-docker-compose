@@ -10,16 +10,23 @@ unset HTTP_PORT
 unset HTTP_HOST
 
 if ! id app >/dev/null 2>&1; then
-	addgroup -g $OWNER_GID app
-	adduser -D -h /var/www/html -G app -u $OWNER_UID app
+	# what if i actually need a duplicate GID/UID group?
+
+	addgroup -g $OWNER_GID app || echo app:x:$OWNER_GID:app | \
+		tee -a /etc/group
+
+	adduser -D -h /var/www/html -G app -u $OWNER_UID app || \
+		echo app:x:$OWNER_UID:$OWNER_GID:Linux User,,,:/var/www/html:/bin/ash | tee -a /etc/passwd
 fi
+
+update-ca-certificates || true
 
 DST_DIR=/var/www/html/tt-rss
 SRC_REPO=https://git.tt-rss.org/fox/tt-rss.git
 
 [ -e $DST_DIR ] && rm -f $DST_DIR/.app_is_ready
 
-export PGPASSWORD=$TTRSS_DB_PASS 
+export PGPASSWORD=$TTRSS_DB_PASS
 
 [ ! -e /var/www/html/index.php ] && cp ${SCRIPT_ROOT}/index.php /var/www/html
 
@@ -27,14 +34,18 @@ PSQL="psql -q -h $TTRSS_DB_HOST -U $TTRSS_DB_USER $TTRSS_DB_NAME"
 
 if [ ! -d $DST_DIR/.git ]; then
 	mkdir -p $DST_DIR
+	chown $OWNER_UID:$OWNER_GID $DST_DIR
+
 	echo cloning tt-rss source from $SRC_REPO to $DST_DIR...
-	git clone $SRC_REPO $DST_DIR || echo error: failed to clone master repository.
+	sudo -u app git clone --depth 1 $SRC_REPO $DST_DIR || echo error: failed to clone master repository.
 else
 	echo updating tt-rss source in $DST_DIR from $SRC_REPO...
+
+	chown -R $OWNER_UID:$OWNER_GID $DST_DIR
 	cd $DST_DIR && \
-		git config core.filemode false && \
-		git config pull.rebase false && \
-		git pull origin master || echo error: unable to update master repository.
+		sudo -u app git config core.filemode false && \
+		sudo -u app git config pull.rebase false && \
+		sudo -u app git pull origin master || echo error: unable to update master repository.
 fi
 
 if [ ! -e $DST_DIR/index.php ]; then
@@ -44,39 +55,42 @@ fi
 
 if [ ! -d $DST_DIR/plugins.local/nginx_xaccel ]; then
 	echo cloning plugins.local/nginx_xaccel...
-	git clone https://git.tt-rss.org/fox/ttrss-nginx-xaccel.git \
+	sudo -u app git clone https://git.tt-rss.org/fox/ttrss-nginx-xaccel.git \
 		$DST_DIR/plugins.local/nginx_xaccel ||  echo warning: failed to clone nginx_xaccel.
 else
 	if [ -z "$TTRSS_NO_STARTUP_PLUGIN_UPDATES" ]; then
 		echo updating all local plugins...
 
 		find $DST_DIR/plugins.local/ -maxdepth 1 -mindepth 1 -type d | while read PLUGIN; do
-			echo updating $PLUGIN...
+			if [ -d $PLUGIN/.git ]; then
+				echo updating $PLUGIN...
 
-			cd $PLUGIN && \
-				git config core.filemode false && \
-				git config pull.rebase false && \
-			  	git pull origin master || echo warning: attempt to update plugin $PLUGIN failed.
+				cd $PLUGIN && \
+					sudo -u app git config core.filemode false && \
+					sudo -u app git config pull.rebase false && \
+					sudo -u app git pull origin master || echo warning: attempt to update plugin $PLUGIN failed.
+			fi
 		done
 	else
 		echo updating plugins.local/nginx_xaccel...
+
 		cd $DST_DIR/plugins.local/nginx_xaccel && \
-			git config core.filemode false && \
-			git config pull.rebase false && \
-		  	git pull origin master || echo warning: attempt to update plugin nginx_xaccel failed.
+			sudo -u app git config core.filemode false && \
+			sudo -u app git config pull.rebase false && \
+			sudo -u app git pull origin master || echo warning: attempt to update plugin nginx_xaccel failed.
 	fi
 fi
 
 cp ${SCRIPT_ROOT}/config.docker.php $DST_DIR/config.php
 chmod 644 $DST_DIR/config.php
 
-chown -R $OWNER_UID:$OWNER_GID $DST_DIR \
-	/var/log/php7
-
 for d in cache lock feed-icons; do
 	chmod 777 $DST_DIR/$d
 	find $DST_DIR/$d -type f -exec chmod 666 {} \;
 done
+
+chown -R $OWNER_UID:$OWNER_GID $DST_DIR \
+	/var/log/php7
 
 $PSQL -c "create extension if not exists pg_trgm"
 
@@ -90,6 +104,20 @@ fi
 # this was previously generated
 rm -f $DST_DIR/config.php.bak
 
+if [ ! -z "${TTRSS_CORE_DUMPS_ENABLED}" ]; then
+	apk add gdb
+
+	echo "don't forget to enable core dumps on the host:"
+	echo "echo '/tmp/core-%e.%p' > /proc/sys/kernel/core_pattern"
+	echo "then run gdb /usr/sbin/php-fpm7 /tmp/coredump-php-fpm-xyz"
+
+	# enable core dumps
+	sed -i.bak \
+	-e 's/;\(rlimit_core\) = .*/\1 = unlimited/' \
+	-e 's/; *\(process.dumpable\) = .*/\1 = yes/' \
+			/etc/php7/php-fpm.d/www.conf
+fi
+
 if [ ! -z "${TTRSS_XDEBUG_ENABLED}" ]; then
 	if [ -z "${TTRSS_XDEBUG_HOST}" ]; then
 		export TTRSS_XDEBUG_HOST=$(ip ro sh 0/0 | cut -d " " -f 3)
@@ -98,19 +126,55 @@ if [ ! -z "${TTRSS_XDEBUG_ENABLED}" ]; then
 	env | grep TTRSS_XDEBUG
 	cat > /etc/php7/conf.d/50_xdebug.ini <<EOF
 zend_extension=xdebug.so
-xdebug.mode=develop,trace,debug
+xdebug.mode=debug
 xdebug.start_with_request = yes
 xdebug.client_port = ${TTRSS_XDEBUG_PORT}
 xdebug.client_host = ${TTRSS_XDEBUG_HOST}
 EOF
 fi
 
-cd $DST_DIR && sudo -E -u app php7 ./update.php --update-schema=force-yes
+sed -i.bak "s/^\(memory_limit\) = \(.*\)/\1 = ${PHP_WORKER_MEMORY_LIMIT}/" \
+	/etc/php7/php.ini
+
+sed -i.bak "s/^\(pm.max_children\) = \(.*\)/\1 = ${PHP_WORKER_MAX_CHILDREN}/" \
+	/etc/php7/php-fpm.d/www.conf
+
+sudo -Eu app php7 $DST_DIR/update.php --update-schema=force-yes
+
+if [ ! -z "$ADMIN_USER_PASS" ]; then
+	sudo -Eu app php7 $DST_DIR/update.php --user-set-password "admin:$ADMIN_USER_PASS"
+else
+	if sudo -Eu app php7 $DST_DIR/update.php --user-check-password "admin:password"; then
+		RANDOM_PASS=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 16 ; echo '')
+
+		echo "*****************************************************************************"
+		echo "* Setting initial built-in admin user password to '$RANDOM_PASS'        *"
+		echo "* If you want to set it manually, use ADMIN_USER_PASS environment variable. *"
+		echo "*****************************************************************************"
+
+		sudo -Eu app php7 $DST_DIR/update.php --user-set-password "admin:$RANDOM_PASS"
+	fi
+fi
+
+if [ ! -z "$ADMIN_USER_ACCESS_LEVEL" ]; then
+	sudo -Eu app php7 $DST_DIR/update.php --user-set-access-level "admin:$ADMIN_USER_ACCESS_LEVEL"
+fi
+
+if [ ! -z "$AUTO_CREATE_USER" ]; then
+	sudo -Eu app /bin/sh -c "php7 $DST_DIR/update.php --user-exists $AUTO_CREATE_USER ||
+		php7 $DST_DIR/update.php --force-yes --user-add \"$AUTO_CREATE_USER:$AUTO_CREATE_USER_PASS:$AUTO_CREATE_USER_ACCESS_LEVEL\""
+fi
 
 rm -f /tmp/error.log && mkfifo /tmp/error.log && chown app:app /tmp/error.log
 
 (tail -q -f /tmp/error.log >> /proc/1/fd/2) &
 
+unset ADMIN_USER_PASS
+unset AUTO_CREATE_USER_PASS
+
+# cleanup any old lockfiles
+rm -vf -- /var/www/html/tt-rss/lock/*.lock
+
 touch $DST_DIR/.app_is_ready
 
-exec /usr/sbin/php-fpm7 --nodaemonize --force-stderr
+exec /usr/sbin/php-fpm7 --nodaemonize --force-stderr -R
